@@ -8,7 +8,7 @@ from mock import (
 )
 
 from pic2map.gps import (
-    filter_gps_metadata,
+    get_gps_metadata,
     validate_gps_metadata,
 )
 
@@ -65,7 +65,7 @@ class FilterGPSMetadataTest(unittest.TestCase):
             ]
 
             paths = Mock()
-            metadata_records = filter_gps_metadata(paths)
+            metadata_records = get_gps_metadata(paths)
             self.assertListEqual(
                 metadata_records,
                 [VALID_METADATA, VALID_METADATA_NO_DATETIME],

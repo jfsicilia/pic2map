@@ -14,12 +14,13 @@ var LocationMap = {
     console.log('Adding ' + markersData.length + ' markers');
     markersData.forEach(function(markerData) {
         var marker = L.marker([markerData.latitude, markerData.longitude]);
-        var text = 'Filename: ' + markerData.filename;
+        var text = '<b>Filename:</b> ' + markerData.filename;
         if (markerData.datetime) {
-          text += '<br>GPS datetime: ' + markerData.datetime;
+          text += '<br><b>GPS datetime:</b> ' + markerData.datetime;
         }
+        text += '<img width="100% !important" src="/get_image?filename=' + encodeURIComponent(markerData.filename) + '" />'
 
-        marker.bindPopup(text);
+        marker.bindPopup(text, {maxWidth: 700});
         this.markerCluster.addLayer(marker);
     }, this);
   }

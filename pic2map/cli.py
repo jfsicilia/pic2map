@@ -10,7 +10,7 @@ from pic2map.db import (
     transform_metadata_to_row,
 )
 from pic2map.fs import TreeExplorer
-from pic2map.gps import filter_gps_metadata
+from pic2map.gps import get_gps_metadata
 from pic2map.server.app import app
 
 
@@ -28,31 +28,47 @@ def main(argv=None):
 
 def add(args):
     """Add location information for pictures under directory."""
-    logger.info('Adding image files from %r...', args.directory)
-    tree_explorer = TreeExplorer(args.directory)
+    dir = os.path.abspath(os.path.join(os.path.dirname(__file__), args.directory))
+    logger.info('Adding image files from %r...', dir)
+    tree_explorer = TreeExplorer(dir)
     paths = tree_explorer.paths()
+    paths_set = set(paths)
 
-    gps_metadata_records = filter_gps_metadata(paths)
-    logger.info(
-        '%d picture files with GPS metadata found under %s',
-        len(gps_metadata_records),
-        args.directory)
+    with LocationDB() as database:
+        existing_paths = set(row.filename for row in database.select_all())
+        filtered_paths = paths_set - existing_paths
+        if len(filtered_paths) < len(paths):
+            logger.info(
+                'Processing %d files, skipping %d files (already in database)',
+                len(filtered_paths),
+                len(paths) - len(filtered_paths)
+            )
 
-    location_rows = [
-        transform_metadata_to_row(metadata)
-        for metadata in gps_metadata_records
-    ]
-    if location_rows:
-        with LocationDB() as database:
-            database.insert(location_rows)
+        for gps_metadata_records in get_gps_metadata(list(filtered_paths)):
+            location_rows = [
+                transform_metadata_to_row(metadata)
+                for metadata in gps_metadata_records
+            ]
+            if location_rows:
+                database.insert(location_rows)
+                logger.info('%d files added to database', len(location_rows))
 
 
 def remove(args):
     """Remove location information for pictures under directory."""
-    logger.info('Removing image files from %r...', args.directory)
+    dir = os.path.abspath(os.path.join(os.path.dirname(__file__), args.directory))
+    logger.info('Removing image files from %r...', dir)
 
     with LocationDB() as database:
-        database.delete(args.directory)
+        database.delete(dir)
+
+
+def reset(args):
+    """Reset the database."""
+    logger.info('Resetting the database...')
+
+    with LocationDB() as database:
+        database.truncate()
 
 
 def count(_args):
@@ -132,6 +148,9 @@ def parse_arguments(argv):
     remove_parser.add_argument(
         'directory', type=valid_directory, help='Base directory')
     remove_parser.set_defaults(func=remove)
+
+    remove_parser = subparsers.add_parser('reset', help=reset.__doc__)
+    remove_parser.set_defaults(func=reset)
 
     count_parser = subparsers.add_parser('count', help=count.__doc__)
     count_parser.set_defaults(func=count)

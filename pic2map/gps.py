@@ -1,4 +1,5 @@
 """GPS data model and validation."""
+from itertools import count
 import logging
 
 import exiftool
@@ -26,6 +27,8 @@ TAGS = [
     'EXIF:GPSTimeStamp',
 ]
 
+PATHS_PARTITION_SIZE = 1000
+
 POSITIVE_NUMBER = All(Any(int, float), Range(min=0))
 
 SCHEMA = Schema({
@@ -34,8 +37,6 @@ SCHEMA = Schema({
     Required('EXIF:GPSLongitude'): POSITIVE_NUMBER,
     Required('EXIF:GPSLongitudeRef'): Any(u'E', u'W'),
     Required('SourceFile'): unicode,
-    'EXIF:GPSDateStamp': All(unicode, Match(r'\d{4}:\d{2}:\d{2}')),
-    'EXIF:GPSTimeStamp': All(unicode, Match(r'\d{2}:\d{2}:\d{2}')),
 })
 
 
@@ -58,22 +59,36 @@ def validate_gps_metadata(exif_metadata):
     return True
 
 
-def filter_gps_metadata(paths):
-    """Filter out metadata records that don't have GPS information.
-
+def get_gps_metadata(paths):
+    """
     :param paths: Picture filenames to get metadata from
     :type paths: list(str)
-    :returns: Picture files with GPS data
+    :returns: The metadata records
     :rtype: list(dict(str))
 
     """
+    partitions = list(partition(paths, PATHS_PARTITION_SIZE))
+    if len(partitions) > 1:
+        logger.info(
+            'Getting GPS metadata for %d files in %d partitions',
+            len(paths),
+            len(partitions)
+        )
     with exiftool.ExifToolHelper() as tool:
-        metadata_records = tool.get_tags(paths, TAGS)
+        for i, part in enumerate(partition(paths, PATHS_PARTITION_SIZE)):
+            metadata_records = tool.get_tags(part, TAGS)
+            for metadata_record in metadata_records:
+                metadata_record['valid'] = validate_gps_metadata(metadata_record)
 
-    gps_metadata_records = [
-        metadata_record
-        for metadata_record in metadata_records
-        if validate_gps_metadata(metadata_record)
-    ]
+            if len(partitions) > 1:
+                logger.info(
+                    'Found %d GPS metadata records in partition %d',
+                    len(m for m in metadata_records if m['valid']),
+                    i + 1
+                )
+            yield metadata_records
 
-    return gps_metadata_records
+
+def partition(lst, size):
+    for i in range(0, len(lst), size):
+        yield lst[i : i+size]

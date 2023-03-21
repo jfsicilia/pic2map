@@ -56,7 +56,8 @@ class TreeExplorer(object):
                     logger.warning('Unable to access file: %r', path)
                     continue
 
-                if 'JPEG image data' in magic.from_file(path):
+                # if 'JPEG image data' in magic.from_file(path):
+                if path.endswith(".jpg") or path.endswith(".JPG"):
                     paths.append(path)
 
         return paths

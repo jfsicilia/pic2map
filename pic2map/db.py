@@ -20,6 +20,8 @@ from sqlalchemy.types import (
 )
 from xdg import BaseDirectory
 
+from pic2map.gps import validate_gps_metadata
+
 logger = logging.getLogger(__name__)
 
 
@@ -124,16 +126,33 @@ class LocationDB(Database):
         result = self.connection.execute(insert_query, rows)
         logger.debug('%d rows inserted', result.rowcount)
 
-    def select_all(self):
+    def select_all(self, gps_data_only = False):
         """Get all rows from the location table.
 
         :returns: Location information rows
         :rtype: sqlalchemy.engine.result.ResultProxy
 
         """
-        select_query = select(self.location_table)
+        table = self.location_table
+        select_query = table.select()
+        if gps_data_only:
+            select_query = select_query.filter(table.c.latitude.isnot(None))
         result = self.connection.execute(select_query)
         return result
+
+    def file_exists(self, filename):
+        """Checks if the filename exists in the database.
+
+        :param filename: The filename to search for
+        :type filename: str
+        :returns: whether the filename exists in the database
+        :rtype: bool
+
+        """
+        table = self.location_table
+        select_query = table.select().where(table.c.filename == filename)
+        result = self.connection.execute(select_query)
+        return len(list(result)) > 0
 
     def delete(self, directory):
         """Delete rows with a filename under a given directory.
@@ -148,6 +167,13 @@ class LocationDB(Database):
             .where(table.c.filename.startswith(directory))
         )
         result = self.connection.execute(delete_query)
+        logger.debug('%d rows deleted', result.rowcount)
+        return result
+    
+    def truncate(self):
+        """Truncate the location table."""
+        query = self.location_table.delete()
+        result = self.connection.execute(query)
         logger.debug('%d rows deleted', result.rowcount)
         return result
 
@@ -169,32 +195,34 @@ def transform_metadata_to_row(metadata):
     :param metadata: GPS metadata as returned by exiftool
     :type metadata: dict(str)
     :returns: Database row
-    :rtype: dict(str)
+    :rtype: dict(str), bool
 
     """
     new_metadata = {
         'filename': metadata['SourceFile'],
-        'latitude': metadata['EXIF:GPSLatitude'],
-        'longitude': metadata['EXIF:GPSLongitude'],
     }
 
-    if metadata['EXIF:GPSLatitudeRef'] == u'S':
-        new_metadata['latitude'] *= -1
-    if metadata['EXIF:GPSLongitudeRef'] == u'W':
-        new_metadata['longitude'] *= -1
+    if metadata["valid"]:
+        new_metadata['latitude'] = metadata['EXIF:GPSLatitude'],
+        new_metadata['longitude'] = metadata['EXIF:GPSLongitude'],
+        if metadata['EXIF:GPSLatitudeRef'] == u'S':
+            new_metadata['latitude'] *= -1
+        if metadata['EXIF:GPSLongitudeRef'] == u'W':
+            new_metadata['longitude'] *= -1
 
-    if ('EXIF:GPSDateStamp' in metadata and
-            'EXIF:GPSTimeStamp' in metadata):
-        datetime_str = u'{} {}'.format(
-            metadata['EXIF:GPSDateStamp'],
-            metadata['EXIF:GPSTimeStamp'],
-        )
+        if ('EXIF:GPSDateStamp' in metadata and
+                'EXIF:GPSTimeStamp' in metadata):
+            datetime_str = u'{} {}'.format(
+                metadata['EXIF:GPSDateStamp'],
+                metadata['EXIF:GPSTimeStamp'],
+            )
 
-        new_metadata['datetime'] = arrow.get(
-            datetime_str,
-            ['YYYY:MM:DD HH:mm:ss.SSS', 'YYYY:MM:DD HH:mm:ss'],
-        ).datetime
-    else:
-        new_metadata['datetime'] = None
+            try:
+                new_metadata['datetime'] = arrow.get(
+                    datetime_str,
+                    ['YYYY:MM:DD HH:mm:ss.SSS', 'YYYY:MM:DD HH:mm:ss'],
+                ).datetime
+            except:
+                pass
 
     return new_metadata
