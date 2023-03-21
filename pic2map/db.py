@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Location database."""
 
 import logging
@@ -11,6 +10,7 @@ from sqlalchemy import (
     MetaData,
     Table,
     create_engine,
+    func,
     select,
 )
 from sqlalchemy.types import (
@@ -41,9 +41,10 @@ class Database(object):
         self.engine = create_engine(
             'sqlite:///{}'.format(db_filename),
             connect_args={'check_same_thread': False},
+            isolation_level="AUTOCOMMIT"
         )
         self.connection = None
-        self.metadata = MetaData(bind=self.engine)
+        self.metadata = MetaData()
 
     def connect(self):
         """Create connection."""
@@ -75,11 +76,11 @@ class Database(object):
         :rtype: sqlalchemy.schema.Table
 
         """
-        if not isinstance(table_name, basestring):
+        if not isinstance(table_name, str):
             raise TypeError('Unexpected table name: {}'.format(table_name))
         table = self.metadata.tables.get(table_name)
         if table is None:
-            table = Table(table_name, self.metadata, autoload=True)
+            table = Table(table_name, self.metadata, autoload_with=self.engine)
         return table
 
 
@@ -110,7 +111,7 @@ class LocationDB(Database):
                 Column('longitude', Float),
                 Column('datetime', DateTime),
             )
-            self.location_table.create()
+            self.location_table.create(bind=self.engine)
 
     def insert(self, rows):
         """Insert rows in location table.
@@ -130,7 +131,7 @@ class LocationDB(Database):
         :rtype: sqlalchemy.engine.result.ResultProxy
 
         """
-        select_query = select([self.location_table])
+        select_query = select(self.location_table)
         result = self.connection.execute(select_query)
         return result
 
@@ -157,8 +158,8 @@ class LocationDB(Database):
         :rtype: int
 
         """
-        select_query = self.location_table.count()
-        result = self.connection.execute(select_query)
+        stmt = select(func.count()).select_from(self.location_table)
+        result = self.connection.execute(stmt)
         return result.scalar()
 
 

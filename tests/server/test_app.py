@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Web application server tests."""
 
 import json

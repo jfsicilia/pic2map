@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Utility functionality."""
 
 def average(collection, function=None):

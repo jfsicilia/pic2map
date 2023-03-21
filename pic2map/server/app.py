@@ -1,9 +1,6 @@
-# -*- coding: utf-8 -*-
 """Web application server."""
 
 import json
-
-from operator import itemgetter
 
 from flask import (
     Flask,
@@ -26,8 +23,8 @@ def index():
     with LocationDB() as location_db:
         db_rows = list(location_db.select_all())
         centroid = json.dumps([
-            average(db_rows, itemgetter('latitude')),
-            average(db_rows, itemgetter('longitude')),
+            average([row.latitude for row in db_rows]),
+            average([row.longitude for row in db_rows]),
         ])
         rows = json.dumps([row_to_serializable(db_row) for db_row in db_rows])
 
@@ -40,12 +37,12 @@ def row_to_serializable(row):
     This is needed to pass the location informaton to the javascript code.
 
     :param row: Database row with location information
-    :type row: sqlalchemy.engine.result.RowProxy
+    :type row: sqlalchemy.engine.row.Row
     :returns: Location information in JSON format
     :rtype: dict(str)
 
     """
-    row = dict(row)
+    row = row._asdict()
     if row['datetime']:
         row['datetime'] = row['datetime'].strftime(DATE_EXCHANGE_FORMAT)
     return row

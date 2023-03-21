@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """GPS model and validation tests."""
 
 import unittest

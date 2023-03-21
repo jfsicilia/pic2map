@@ -1,13 +1,11 @@
 *.py[cod]
 
-# C extensions
-*.so
-
 # Packages
 *.egg
 *.egg-info
 dist
 build
+.eggs
 eggs
 parts
 bin
@@ -27,9 +25,6 @@ pip-log.txt
 nosetests.xml
 htmlcov
 
-# Translations
-*.mo
-
 # Mr Developer
 .mr.developer.cfg
 .project
@@ -44,3 +39,6 @@ docs/_build
 
 # vim swap files
 *.swp
+
+# venv
+.venv

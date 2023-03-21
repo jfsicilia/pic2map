@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Command Line Interface test cases."""
 
 import argparse
@@ -7,7 +6,7 @@ import os
 import tempfile
 import unittest
 
-from StringIO import StringIO
+from io import StringIO
 
 from mock import (
     MagicMock as Mock,

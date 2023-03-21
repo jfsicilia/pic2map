@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Command Line Interface."""
 
 import argparse
@@ -63,7 +62,7 @@ def count(_args):
     with LocationDB() as database:
         file_count = database.count()
 
-    print file_count
+    print(file_count)
 
 
 def serve(_args):

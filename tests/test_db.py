@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Test database functionality."""
 
 import os
@@ -166,6 +165,7 @@ class LocationDBTest(unittest.TestCase):
             self.assertEqual(len(rows), 1)
             row = rows[0]
             self.assertSequenceEqual(row, (u'Hello world!',))
+            self.assertEqual(row.name, 'Hello world!')
 
     def test_remove(self):
         """Delete rows for files under a given directory."""

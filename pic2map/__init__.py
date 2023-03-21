@@ -1,6 +1,5 @@
-# -*- coding: utf-8 -*-
 """pic2map: display pictures location on a map."""
 
-__author__ = 'Javier Collado'
-__email__ = 'jcollado@nowsecure.com'
-__version__ = '0.1.0'
+AUTHOR = 'Javier Collado, Joshua Sangmeister'
+EMAIL = 'jcollado@nowsecure.com, joshua.sangmeister@gmail.com'
+VERSION = '0.2.0'

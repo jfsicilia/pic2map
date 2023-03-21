@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """GPS data model and validation."""
 import logging
 
@@ -12,6 +11,7 @@ from voluptuous import (
     Range,
     Required,
     Schema,
+    unicode
 )
 
 logger = logging.getLogger(__name__)
@@ -67,8 +67,8 @@ def filter_gps_metadata(paths):
     :rtype: list(dict(str))
 
     """
-    with exiftool.ExifTool() as tool:
-        metadata_records = tool.get_tags_batch(TAGS, paths)
+    with exiftool.ExifToolHelper() as tool:
+        metadata_records = tool.get_tags(paths, TAGS)
 
     gps_metadata_records = [
         metadata_record
