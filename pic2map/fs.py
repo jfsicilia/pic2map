@@ -7,6 +7,8 @@ import magic
 
 logger = logging.getLogger(__name__)
 
+# Magic id for JPEG files
+MAGIC_JPEG = 'JPEG image data'
 
 class TreeExplorer(object):
 
@@ -19,6 +21,10 @@ class TreeExplorer(object):
 
     def __init__(self, directory):
         """Initialize tree explorer."""
+        
+        # Save absolute path of directory
+        if not os.path.isabs(directory):
+            directory = os.path.abspath(directory)
         self.directory = directory
 
     def paths(self):
@@ -56,7 +62,8 @@ class TreeExplorer(object):
                     logger.warning('Unable to access file: %r', path)
                     continue
 
-                if 'JPEG image data' in magic.from_file(path):
+                # Check if file is a JPEG image 
+                if MAGIC_JPEG in magic.from_file(path):
                     paths.append(path)
 
         return paths

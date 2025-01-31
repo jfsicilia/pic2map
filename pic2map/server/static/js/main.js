@@ -12,11 +12,16 @@ var LocationMap = {
   },
   'addMarkers': function addMarkers(markersData) {
     console.log('Adding ' + markersData.length + ' markers');
+    console.log(markersData);
     markersData.forEach(function(markerData) {
-        var marker = L.marker([markerData.latitude, markerData.longitude]);
-        var text = 'Filename: ' + markerData.filename;
+        let marker = L.marker([markerData.latitude, markerData.longitude]);
+        let filename = markerData.filepath.split('/').pop();
+        let text = `<a href="image?id=${markerData.id}"><img alt="${filename}" src="image?id=${markerData.id}" width="200px"/></a>`;
+
+        text += `<br>Album: <b>${markerData.album}</b>`;
+        text += `<br>File: <b>${filename}</b>`;
         if (markerData.datetime) {
-          text += '<br>GPS datetime: ' + markerData.datetime;
+          text += `<br>GPS datetime <b>${markerData.datetime}</b>`;
         }
 
         marker.bindPopup(text);

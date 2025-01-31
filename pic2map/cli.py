@@ -18,28 +18,44 @@ logger = logging.getLogger(__name__)
 
 
 def main(argv=None):
-    """Entry point for the pic2map.py script."""
+    """
+    Entry point for the pic2map.py script.
+
+    Args:
+        argv (list, optional): List of command-line arguments. Defaults to None, which uses sys.argv[1:].
+
+    This function parses command-line arguments, configures logging, and invokes the appropriate function
+    based on the parsed arguments. If no function is specified in the arguments, it prints the argument parser help.
+    """
     if argv is None:
         argv = sys.argv[1:]
     args = parse_arguments(argv)
     configure_logging(args.log_level)
-    args.func(args)
-
+    if hasattr(args, "func"):
+        args.func(args)
+    else:
+        args.parser.print_help()
 
 def add(args):
-    """Add location information for pictures under directory."""
-    logger.info('Adding image files from %r...', args.directory)
-    tree_explorer = TreeExplorer(args.directory)
-    paths = tree_explorer.paths()
+    """Add location information for pictures in an album.
+    
+    :param args.album: Album name
+    :type args.album: str
+    :param args.directories: One or more directories with album pictures
+    :type args.directories: list(str)
+    """
+    paths = []
+    for directory in args.directories:
+        logger.info('Adding image files for album %r from %r...', args.album, directory)
+        tree_explorer = TreeExplorer(directory)
+        paths.extend(tree_explorer.paths())
 
     gps_metadata_records = filter_gps_metadata(paths)
-    logger.info(
-        '%d picture files with GPS metadata found under %s',
-        len(gps_metadata_records),
-        args.directory)
+
+    logger.info('%d pictures found with GPS metadata', len(gps_metadata_records))
 
     location_rows = [
-        transform_metadata_to_row(metadata)
+        transform_metadata_to_row(args.album, metadata)
         for metadata in gps_metadata_records
     ]
     if location_rows:
@@ -48,25 +64,35 @@ def add(args):
 
 
 def remove(args):
-    """Remove location information for pictures under directory."""
-    logger.info('Removing image files from %r...', args.directory)
+    """Remove album/s from the database.
+    
+    :param args.albums: One or more albums to be removed
+    :type args.albums: list(str)
+    """
 
     with LocationDB() as database:
-        database.delete(args.directory)
+        for album in args.albums:
+            logger.info('Removing image files from album %r...', album)
+            nRows = database.delete(album)
+            if (nRows > 0):
+                logger.info('Deleted album %s with %d rows', album, nRows)
 
-
-def count(_args):
-    """Get number picture files in the database."""
-    logger.info('Getting image files in the database...')
+def list(args):
+    """Retrieve the list of albums and the number of pictures in the database."""
+    logger.info("Getting albums' information from the database...")
 
     with LocationDB() as database:
-        file_count = database.count()
+        albums = database.list_albums(args.albums)
+        for album in albums:
+            count = database.count(album)
+            logger.info('Album {!r} has {} pictures'.format(album, count))
 
-    print(file_count)
+def server(args):
+    """Run web server.
 
-
-def serve(_args):
-    """Run web server."""
+    :param _args: Command line arguments 
+    """
+    app.config["ALBUMS"] = args.albums
     app.run(debug=True)
 
 
@@ -110,7 +136,7 @@ def parse_arguments(argv):
 
     """
     parser = argparse.ArgumentParser(
-        description='Display pictures location in a map')
+        description='Show the locations of pictures from an album on a map.')
     log_levels = ['debug', 'info', 'warning', 'error', 'critical']
     parser.add_argument(
         '-l', '--log-level',
@@ -120,24 +146,35 @@ def parse_arguments(argv):
         help=('Log level. One of {0} or {1} '
               '(%(default)s by default)'
               .format(', '.join(log_levels[:-1]), log_levels[-1])))
+    parser.set_defaults(parser=parser)
 
     subparsers = parser.add_subparsers(help='Subcommands')
 
+    # ADD subcommand
     add_parser = subparsers.add_parser('add', help=add.__doc__)
     add_parser.add_argument(
-        'directory', type=valid_directory, help='Base directory')
+        'album', type=str, help='Album name')
+    add_parser.add_argument(
+        'directories', type=valid_directory, nargs='+', help='One or more directories with album pictures')
     add_parser.set_defaults(func=add)
 
+    # REMOVE subcommand
     remove_parser = subparsers.add_parser('remove', help=remove.__doc__)
     remove_parser.add_argument(
-        'directory', type=valid_directory, help='Base directory')
+        'albums', nargs='+', help='Albums to be removed.')
     remove_parser.set_defaults(func=remove)
 
-    count_parser = subparsers.add_parser('count', help=count.__doc__)
-    count_parser.set_defaults(func=count)
+    # LIST subcommand
+    list_parser = subparsers.add_parser('list', help=list.__doc__)
+    list_parser.add_argument(
+        'albums', nargs='*', help='Albums to be listed (if omitted, all albums will be listed).')
+    list_parser.set_defaults(func=list)
 
-    serve_parser = subparsers.add_parser('serve', help=serve.__doc__)
-    serve_parser.set_defaults(func=serve)
+    # SERVER subcommand
+    serve_parser = subparsers.add_parser('server', help=server.__doc__)
+    serve_parser.add_argument(
+        'albums', nargs='*', help='Albums to be shown (if omitted, all albums will be displayed).')
+    serve_parser.set_defaults(func=server)
 
     args = parser.parse_args(argv)
     args.log_level = getattr(logging, args.log_level.upper())

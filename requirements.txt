@@ -1,4 +1,5 @@
 Flask==2.2.3
+Werkzeug==2.3.7
 SQLAlchemy==2.0.7
 PyExifTool==0.5.5
 arrow==1.2.3

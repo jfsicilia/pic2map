@@ -1,10 +1,14 @@
 """Web application server."""
 
 import json
+import os
 
 from flask import (
     Flask,
     render_template,
+    request,
+    abort,
+    send_file,
 )
 
 from pic2map.db import LocationDB
@@ -20,15 +24,36 @@ app = Flask(__name__)
 @app.route('/')
 def index():
     """Application main page."""
+
+    albums = app.config["ALBUMS"]   
     with LocationDB() as location_db:
-        db_rows = list(location_db.select_all())
-        centroid = json.dumps([
-            average([row.latitude for row in db_rows]),
-            average([row.longitude for row in db_rows]),
-        ])
-        rows = json.dumps([row_to_serializable(db_row) for db_row in db_rows])
+        db_rows = list(location_db.select_all(albums))
+        if (len(db_rows) == 0):
+            centroid = json.dumps([0, 0])
+            rows = json.dumps([])
+        else:
+            centroid = json.dumps([
+                average([row.latitude for row in db_rows]),
+                average([row.longitude for row in db_rows]),
+            ])
+            rows = json.dumps([row_to_serializable(db_row) for db_row in db_rows])
 
     return render_template('index.html', centroid=centroid, rows=rows)
+
+
+@app.route('/image')
+def serve_image():
+    # Get requested image id
+    id = request.args.get('id')  
+    if not id:
+        abort(400, "Missing id")
+
+    with LocationDB() as location_db:
+        filepath = location_db.get_by_id(id).fetchone().filepath
+        if not os.path.exists(filepath):
+            abort(404, "Image not found")
+
+    return send_file(filepath, mimetype='image/jpeg')  
 
 
 def row_to_serializable(row):

@@ -127,12 +127,14 @@ class LocationDBTest(unittest.TestCase):
         """Insert records in database."""
         rows = [
             {
+                'album': 'testAlbum',
                 'filename': 'a.jpg',
                 'latitude': 1.2,
                 'longitude': 2.1,
                 'datetime': datetime(2015, 1, 1, 12, 34, 56)
             },
             {
+                'album': 'testAlbum',
                 'filename': 'b.jpg',
                 'latitude': 3.4,
                 'longitude': 4.3,

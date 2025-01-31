@@ -10,15 +10,19 @@ from sqlalchemy import (
     MetaData,
     Table,
     create_engine,
+    UniqueConstraint,
     func,
     select,
 )
 from sqlalchemy.types import (
     DateTime,
     Float,
+    Integer,
     String,
 )
-from xdg import BaseDirectory
+from sqlalchemy.dialects.sqlite import insert as db_insert
+
+# from xdg import BaseDirectory
 
 logger = logging.getLogger(__name__)
 
@@ -94,8 +98,9 @@ class LocationDB(Database):
 
     def __init__(self):
         """Create database if needed."""
-        base_directory = BaseDirectory.save_data_path('pic2map')
-        db_filename = os.path.join(base_directory, 'location.db')
+        # base_directory = BaseDirectory.save_data_path('pic2map')
+        # db_filename = os.path.join(base_directory, 'location.db')
+        db_filename = os.path.join('.', 'location.db')
         Database.__init__(self, db_filename)
 
         if os.path.isfile(db_filename):
@@ -106,10 +111,13 @@ class LocationDB(Database):
             self.location_table = Table(
                 'location',
                 self.metadata,
-                Column('filename', String, unique=True),
+                Column('id', Integer, primary_key=True, autoincrement=True),
+                Column('album', String),
+                Column('filepath', String),
                 Column('latitude', Float),
                 Column('longitude', Float),
                 Column('datetime', DateTime),
+                UniqueConstraint('album', 'filepath', name='uix_album_filepath')
             )
             self.location_table.create(bind=self.engine)
 
@@ -120,50 +128,87 @@ class LocationDB(Database):
         :type rows: list(dict(str))
 
         """
-        insert_query = self.location_table.insert()
+        insert_query = db_insert(self.location_table).on_conflict_do_nothing()
         result = self.connection.execute(insert_query, rows)
         logger.debug('%d rows inserted', result.rowcount)
 
-    def select_all(self):
+    def select_all(self, albums=None):
         """Get all rows from the location table.
 
+        :param albums: List of albums to filter
+        :type albums: list(str)
         :returns: Location information rows
         :rtype: sqlalchemy.engine.result.ResultProxy
 
         """
         select_query = select(self.location_table)
+        if albums:
+            select_query = select_query.where(self.location_table.c.album.in_(albums))
         result = self.connection.execute(select_query)
         return result
 
-    def delete(self, directory):
-        """Delete rows with a filename under a given directory.
+    def get_by_id(self, id):
+        query = self.location_table.select().where(self.location_table.c.id == id)
+        result = self.connection.execute(query)
+        return result
+    
 
-        :param directory: Directory to be used as prefix in the delete query
-        :type directory: str
+    def exists(self, filepath):
+        """Check if a row with the given filepath exists in the location table.
+
+        :param filepath: The filepath to check for
+        :type filepath: str
+        :returns: True if a row with the given filepath exists, False otherwise
+        :rtype: bool
+        """
+        query = self.location_table.select().where(self.location_table.c.filepath == filepath)
+        result = self.connection.execute(query)
+        return result.fetchone() is not None
+
+    def delete(self, album):
+        """Delete rows within a given album.
+
+        :param album: Album to be deleted.
+        :type album: str
+        :return: Number of rows deleted
+        :rtype: int
 
         """
         table = self.location_table
         delete_query = (
             table.delete()
-            .where(table.c.filename.startswith(directory))
+            .where(table.c.album == album)
         )
         result = self.connection.execute(delete_query)
         logger.debug('%d rows deleted', result.rowcount)
-        return result
+        return result.rowcount
 
-    def count(self):
-        """Get number of rows in the database.
+    def list_albums(self, albums):
+        """Get the list of albums in the database.
 
-        :return: Number of rows
+        :return: List of albums.
+        :rtype: list
+
+        """
+        query = select(self.location_table.c.album).distinct()
+        if albums:
+            query = query.where(self.location_table.c.album.in_(albums)).distinct()
+        result = self.connection.execute(query)
+        return [row.album for row in result]
+
+    def count(self, album):
+        """Get number of pictures in an album.
+
+        :return: Number of pictures
         :rtype: int
 
         """
-        stmt = select(func.count()).select_from(self.location_table)
+        stmt = select(func.count()).select_from(self.location_table).filter(self.location_table.c.album == album)
         result = self.connection.execute(stmt)
         return result.scalar()
 
 
-def transform_metadata_to_row(metadata):
+def transform_metadata_to_row(album, metadata):
     """Transform GPS metadata in database rows.
 
     :param metadata: GPS metadata as returned by exiftool
@@ -173,7 +218,8 @@ def transform_metadata_to_row(metadata):
 
     """
     new_metadata = {
-        'filename': metadata['SourceFile'],
+        'album' : album,
+        'filepath': metadata['SourceFile'],
         'latitude': metadata['EXIF:GPSLatitude'],
         'longitude': metadata['EXIF:GPSLongitude'],
     }
