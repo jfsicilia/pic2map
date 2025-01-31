@@ -42,3 +42,6 @@ docs/_build
 
 # venv
 .venv
+
+# database
+location.db
