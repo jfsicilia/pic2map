@@ -1,0 +1,1 @@
+docker run -d -p 8001:5000 -v /mnt/c/Users/juan/photo:/usr/pic2map/photo --name pic2map pic2map
