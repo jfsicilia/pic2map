@@ -45,6 +45,7 @@ docs/_build
 
 # database
 database
+update_database.sh
 
 # photos
 photo
